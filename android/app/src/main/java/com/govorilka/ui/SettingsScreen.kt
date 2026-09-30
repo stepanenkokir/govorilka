@@ -30,7 +30,7 @@ private const val SERVER_URL_PLACEHOLDER = "http://127.0.0.1:3000"
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = viewModel(factory = GovorilkaViewModelFactory()),
+    viewModel: SettingsViewModel = viewModel(factory = GovorilkaViewModelFactory),
 ) {
     SettingsContent(
         serverBaseUrl = viewModel.serverBaseUrl.value,

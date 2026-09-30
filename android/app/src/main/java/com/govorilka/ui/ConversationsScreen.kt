@@ -46,7 +46,7 @@ private val DateFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SH
 @Composable
 fun ConversationsScreen(
     onOpenSettings: () -> Unit,
-    viewModel: ConversationsViewModel = viewModel(factory = GovorilkaViewModelFactory()),
+    viewModel: ConversationsViewModel = viewModel(factory = GovorilkaViewModelFactory),
 ) {
     ConversationsContent(
         conversations = viewModel.conversations.value,

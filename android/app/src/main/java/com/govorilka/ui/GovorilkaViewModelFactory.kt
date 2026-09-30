@@ -8,7 +8,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.govorilka.GovorilkaApp
 import kotlin.reflect.KClass
 
-class GovorilkaViewModelFactory : ViewModelProvider.Factory {
+object GovorilkaViewModelFactory : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: KClass<T>, extras: CreationExtras): T {
         val container = (checkNotNull(extras[APPLICATION_KEY]) as GovorilkaApp).container
         val viewModel = when (modelClass) {

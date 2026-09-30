@@ -39,7 +39,7 @@ private const val DISABLED_MIC_ALPHA = 0.55f
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
-    viewModel: ChatViewModel = viewModel(factory = GovorilkaViewModelFactory()),
+    viewModel: ChatViewModel = viewModel(factory = GovorilkaViewModelFactory),
 ) {
     ChatContent(
         title = viewModel.title.value ?: NEW_CONVERSATION_TITLE,

@@ -23,7 +23,7 @@ fun GovorilkaNavHost() {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = Routes.CONVERSATIONS) {
         composable(Routes.CONVERSATIONS) {
-            val viewModel: ConversationsViewModel = viewModel(factory = GovorilkaViewModelFactory())
+            val viewModel: ConversationsViewModel = viewModel(factory = GovorilkaViewModelFactory)
             LaunchedEffect(viewModel) {
                 viewModel.openChat.collect { event ->
                     if (navController.currentDestination?.route == Routes.CONVERSATIONS) {

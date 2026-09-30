@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.govorilka.domain.Conversation
 import com.govorilka.domain.ConversationStore
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 data class OpenChat(val conversationId: String)
@@ -15,11 +17,12 @@ data class OpenChat(val conversationId: String)
 class ConversationsViewModel(private val store: ConversationStore) : ViewModel() {
     private val _conversations = mutableStateOf(emptyList<Conversation>())
     private val _pendingDelete = mutableStateOf<Conversation?>(null)
-    private val _openChat = MutableSharedFlow<OpenChat>(extraBufferCapacity = 1)
+    private val _openChat = Channel<OpenChat>(Channel.BUFFERED)
+    private var creating: Job? = null
 
     val conversations: State<List<Conversation>> = _conversations
     val pendingDelete: State<Conversation?> = _pendingDelete
-    val openChat: SharedFlow<OpenChat> = _openChat
+    val openChat: Flow<OpenChat> = _openChat.receiveAsFlow()
 
     init {
         viewModelScope.launch {
@@ -28,11 +31,12 @@ class ConversationsViewModel(private val store: ConversationStore) : ViewModel()
     }
 
     fun onNewConversation() {
-        viewModelScope.launch { _openChat.emit(OpenChat(store.create().id)) }
+        if (creating?.isActive == true) return
+        creating = viewModelScope.launch { _openChat.send(OpenChat(store.create().id)) }
     }
 
     fun onOpenConversation(id: String) {
-        viewModelScope.launch { _openChat.emit(OpenChat(id)) }
+        _openChat.trySend(OpenChat(id))
     }
 
     fun onDeleteRequest(conversation: Conversation) {
