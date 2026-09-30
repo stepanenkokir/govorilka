@@ -6,6 +6,7 @@ import androidx.room3.ForeignKey
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
 import com.govorilka.domain.Conversation
+import com.govorilka.domain.Message
 import com.govorilka.domain.MessageRole
 import com.govorilka.domain.MessageSource
 
@@ -72,3 +73,9 @@ class Converters {
 fun ConversationEntity.toDomain() = Conversation(id, title, createdAt, updatedAt)
 
 fun Conversation.toEntity() = ConversationEntity(id, title, createdAt, updatedAt)
+
+fun MessageEntity.toDomain() =
+    Message(id, conversationId, role, text, source, startMs, endMs, liveSessionId, createdAt)
+
+fun Message.toEntity() =
+    MessageEntity(id, conversationId, role, text, source, startMs, endMs, liveSessionId, createdAt)

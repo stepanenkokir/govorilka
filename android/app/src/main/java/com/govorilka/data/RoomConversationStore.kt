@@ -2,6 +2,7 @@ package com.govorilka.data
 
 import com.govorilka.domain.Conversation
 import com.govorilka.domain.ConversationStore
+import com.govorilka.domain.Message
 import com.govorilka.domain.NEW_CONVERSATION_TITLE
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -22,4 +23,10 @@ class RoomConversationStore(private val dao: ConversationDao) : ConversationStor
     }
 
     override suspend fun delete(id: String) = dao.delete(id)
+
+    override fun observeMessages(conversationId: String): Flow<List<Message>> =
+        dao.observeMessages(conversationId).map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun appendMessage(message: Message, titleIfStillNew: String?) =
+        dao.appendMessage(message.toEntity(), titleIfStillNew, NEW_CONVERSATION_TITLE)
 }

@@ -17,6 +17,18 @@ enum class MessageRole { User, Assistant }
 
 enum class MessageSource { Voice, Text }
 
+data class Message(
+    val id: String,
+    val conversationId: String,
+    val role: MessageRole,
+    val text: String,
+    val source: MessageSource,
+    val startMs: Long?,
+    val endMs: Long?,
+    val liveSessionId: String?,
+    val createdAt: Long,
+)
+
 fun conversationTitle(text: String): String =
     text.trim().take(TITLE_MAX_LENGTH).ifEmpty { NEW_CONVERSATION_TITLE }
 
@@ -28,4 +40,9 @@ interface ConversationStore {
     suspend fun create(): Conversation
 
     suspend fun delete(id: String)
+
+    fun observeMessages(conversationId: String): Flow<List<Message>>
+
+    /** Ignores a repeated id. [titleIfStillNew] replaces the title only while it is [NEW_CONVERSATION_TITLE]. */
+    suspend fun appendMessage(message: Message, titleIfStillNew: String?)
 }

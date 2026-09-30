@@ -13,6 +13,9 @@ import com.govorilka.domain.SettingsStore
 import com.govorilka.domain.VoiceCall
 import com.govorilka.voice.WebRtcVoiceCall
 import com.govorilka.voice.createPeerConnectionFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class AppContainer(context: Context) {
     private val database = Room.databaseBuilder<GovorilkaDatabase>(context, "govorilka.db")
@@ -23,4 +26,7 @@ class AppContainer(context: Context) {
     val settingsStore: SettingsStore = DataStoreSettingsStore(context)
     val govorilkaApi: GovorilkaApi = OkHttpGovorilkaApi()
     val voiceCall: VoiceCall = WebRtcVoiceCall(context, createPeerConnectionFactory(context), govorilkaApi)
+
+    /** Outlives screens so the last utterances of a call are stored after the chat is left. */
+    val writeScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 }

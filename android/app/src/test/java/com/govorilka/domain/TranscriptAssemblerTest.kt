@@ -86,4 +86,54 @@ class TranscriptAssemblerTest {
         assertEquals(emptyList<Utterance>(), result.closed)
         assertEquals(listOf(Utterance("u1", user, "Алло", 2000, 2300)), result.utterances)
     }
+
+    @Test
+    fun closedStaysInTailUntilSaved() {
+        val result = TranscriptAssembler()
+            .add(user, "Раз", 0, 400)
+            .add(user, "Два", 1400, 1600)
+
+        assertEquals(listOf("u0", "u1"), result.feedTail(emptySet()).map { it.id })
+        assertEquals(listOf("u1"), result.feedTail(setOf("u0")).map { it.id })
+    }
+
+    @Test
+    fun openIsDrawnBelowUnsavedClosedEvenIfItStartedEarlier() {
+        val result = TranscriptAssembler()
+            .add(assistant, "Длинный ответ", 0, 500)
+            .add(user, "Да", 100, 200)
+            .add(user, "Нет", 1500, 1700)
+
+        assertEquals(listOf("u1", "u0", "u2"), result.feedTail(emptySet()).map { it.id })
+    }
+
+    @Test
+    fun unsavedClosedSkipsOpenAndSaved() {
+        val result = TranscriptAssembler()
+            .add(user, "Раз", 0, 400)
+            .add(user, "Два", 1400, 1600)
+            .add(assistant, "Ок", 1500, 1700)
+
+        assertEquals(listOf("u0"), result.unsavedClosed(emptySet()).map { it.id })
+        assertEquals(emptyList<Utterance>(), result.unsavedClosed(setOf("u0")))
+    }
+
+    @Test
+    fun emptyDeltaClosesNothing() {
+        val before = TranscriptAssembler().add(user, "Да", 0, 100)
+        val after = before.append(VoiceEvent.Transcript(user, "", 5000, 5100), ids)
+
+        assertEquals(emptyList<Utterance>(), after.unsavedClosed(emptySet()))
+    }
+
+    @Test
+    fun finishedUtterancesAreNotUnsavedOnceStored() {
+        val finished = TranscriptAssembler()
+            .add(user, "Пока", 0, 200)
+            .add(assistant, "До встречи", 100, 400)
+            .finish()
+
+        assertEquals(listOf("u0", "u1"), finished.unsavedClosed(emptySet()).map { it.id })
+        assertEquals(emptyList<Utterance>(), finished.unsavedClosed(setOf("u0", "u1")))
+    }
 }

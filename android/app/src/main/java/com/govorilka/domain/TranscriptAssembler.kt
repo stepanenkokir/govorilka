@@ -37,6 +37,14 @@ data class TranscriptAssembler(
     }
 
     fun finish(): TranscriptAssembler = copy(closed = closed + open.values.nonBlank(), open = emptyMap())
+
+    /** Closed utterances not yet stored, in speech order. */
+    fun unsavedClosed(savedIds: Set<String>): List<Utterance> =
+        closed.filter { it.id !in savedIds }.sortedBy { it.startMs }
+
+    /** What the feed draws below stored messages: unsaved closed first, then open ones. */
+    fun feedTail(savedIds: Set<String>): List<Utterance> =
+        unsavedClosed(savedIds) + open.values.nonBlank().sortedBy { it.startMs }
 }
 
 private fun Collection<Utterance>.nonBlank() = filter { it.text.isNotBlank() }
