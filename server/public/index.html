@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Говорилка — стенд сервера</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f4f0;
+      --card: #ffffff;
+      --text: #1f1c18;
+      --muted: #6b645b;
+      --border: #e6e0d6;
+      --amber: #e8a33d;
+      --amber-strong: #c98320;
+      --danger: #c94a3a;
+      --ok: #2f8f5b;
+      --info: #3a6fc9;
+      --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 20px rgb(0 0 0 / 0.06);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16140f;
+        --card: #211e18;
+        --text: #f1ece4;
+        --muted: #a39a8e;
+        --border: #342f27;
+        --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    main { max-width: 860px; margin: 0 auto; padding: 32px 20px 48px; display: grid; gap: 20px; }
+    h1 { margin: 0; font-size: 22px; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+    .hint { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+    label + label { margin-top: 12px; }
+    input, textarea {
+      font: inherit;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--amber);
+      box-shadow: 0 0 0 3px rgb(232 163 61 / 0.25);
+    }
+    textarea { resize: vertical; min-height: 64px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+    .row input { flex: 1; min-width: 200px; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: transform 0.1s, background 0.15s, opacity 0.15s;
+    }
+    button:active:not(:disabled) { transform: scale(0.97); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .primary { background: var(--amber); color: #2a1a00; }
+    .primary:hover:not(:disabled) { background: var(--amber-strong); }
+    .secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .status { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+    .status[data-state="connecting"] .dot,
+    .status[data-state="closing"] .dot { background: var(--amber); animation: pulse 1s infinite; }
+    .status[data-state="live"] .dot { background: var(--ok); animation: pulse 1.6s infinite; }
+    .status[data-state="error"] .dot { background: var(--danger); }
+    @keyframes pulse { 50% { opacity: 0.35; } }
+    audio { width: 100%; margin-top: 12px; }
+    .log-head { display: flex; justify-content: space-between; align-items: center; }
+    #log {
+      margin: 0;
+      max-height: 420px;
+      overflow: auto;
+      font: 12.5px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace;
+      display: grid;
+      gap: 2px;
+    }
+    #log div { padding: 3px 8px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
+    #log time { color: var(--muted); margin-right: 8px; }
+    .l-started { background: rgb(47 143 91 / 0.14); }
+    .l-input { background: rgb(58 111 201 / 0.12); }
+    .l-output { background: rgb(232 163 61 / 0.16); }
+    .l-error { background: rgb(201 74 58 / 0.15); color: var(--danger); }
+    .l-info { color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Говорилка — стенд сервера</h1>
+    <p class="hint">Проверка /api/session и /api/chat. Секрет живёт только в этом поле и никуда не сохраняется.</p>
+  </header>
+
+  <section class="card">
+    <label>APP_SECRET
+      <input id="secret" type="password" autocomplete="off" placeholder="Секрет из server/.env">
+    </label>
+    <label>Промпт (пусто — сервер подставит свой по умолчанию)
+      <textarea id="instructions" placeholder="instructions"></textarea>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Голос</h2>
+    <div class="row">
+      <button id="start" class="primary">Начать</button>
+      <button id="stop" class="secondary" disabled>Закончить</button>
+      <span id="status" class="status" data-state="idle"><span class="dot"></span><span id="status-text">Не подключено</span></span>
+    </div>
+    <audio id="audio" autoplay controls></audio>
+  </section>
+
+  <section class="card">
+    <h2>Текст</h2>
+    <div class="row">
+      <input id="chat-input" placeholder="Сообщение для /api/chat">
+      <button id="send" class="primary">Отправить</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="log-head">
+      <h2>Лог</h2>
+      <button id="clear" class="secondary">Очистить</button>
+    </div>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script type="module">
+  const ICE_TIMEOUT_MS = 10_000;
+  const CLOSE_TIMEOUT_MS = 15_000;
+  const LOG_CLASS = {
+    "session.started": "l-started",
+    "session.input_transcript.delta": "l-input",
+    "session.output_transcript.delta": "l-output",
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const ui = {
+    secret: $("secret"), instructions: $("instructions"), start: $("start"), stop: $("stop"),
+    status: $("status"), statusText: $("status-text"), audio: $("audio"),
+    chatInput: $("chat-input"), send: $("send"), log: $("log"), clear: $("clear"),
+  };
+
+  const call = { peer: null, channel: null, mic: null, closeTimer: null, started: false, closed: false };
+  const chatHistory = [];
+
+  function log(text, cls = "l-info") {
+    const row = document.createElement("div");
+    row.className = cls;
+    const time = document.createElement("time");
+    time.textContent = new Date().toLocaleTimeString("ru-RU");
+    row.append(time, text);
+    ui.log.append(row);
+    ui.log.scrollTop = ui.log.scrollHeight;
+  }
+
+  function setStatus(state, text) {
+    ui.status.dataset.state = state;
+    ui.statusText.textContent = text;
+  }
+
+  async function api(path, body) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${ui.secret.value}` },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`${response.status}: ${data.error ?? response.statusText}`);
+    return data;
+  }
+
+  function describeEvent(event) {
+    if (event.type === "session.started") return `session.started id=${event.session?.id}`;
+    if (event.type?.endsWith("_transcript.delta")) {
+      return `${event.type} [${event.start_ms}–${event.end_ms}] ${JSON.stringify(event.delta)}`;
+    }
+    const json = JSON.stringify(event);
+    return json.length > 300 ? `${json.slice(0, 300)}…` : json;
+  }
+
+  function onChannelMessage({ data }) {
+    let event;
+    try {
+      event = JSON.parse(data);
+    } catch {
+      log(`Не удалось разобрать событие: ${String(data).slice(0, 200)}`, "l-error");
+      return;
+    }
+    log(describeEvent(event), LOG_CLASS[event.type]);
+    if (event.type === "session.started") {
+      call.started = true;
+      ui.stop.disabled = false;
+      setStatus("live", "Слушаю");
+    } else if (event.type === "session.closed") {
+      call.closed = true;
+      cleanup("Сессия закрыта");
+    }
+  }
+
+  function waitForIce(peer) {
+    if (peer.iceGatheringState === "complete") return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        peer.removeEventListener("icegatheringstatechange", onChange);
+        reject(new Error("Таймаут сбора ICE"));
+      }, ICE_TIMEOUT_MS);
+      function onChange() {
+        if (peer.iceGatheringState !== "complete") return;
+        clearTimeout(timer);
+        peer.removeEventListener("icegatheringstatechange", onChange);
+        resolve();
+      }
+      peer.addEventListener("icegatheringstatechange", onChange);
+    });
+  }
+
+  function cleanup(reason, state = "idle") {
+    clearTimeout(call.closeTimer);
+    call.mic?.getTracks().forEach((track) => track.stop());
+    call.channel?.close();
+    call.peer?.close();
+    Object.assign(call, { peer: null, channel: null, mic: null, closeTimer: null, started: false });
+    ui.audio.srcObject = null;
+    ui.start.disabled = false;
+    ui.stop.disabled = true;
+    setStatus(state, reason);
+    log(reason, state === "error" ? "l-error" : "l-info");
+  }
+
+  async function startCall() {
+    ui.start.disabled = true;
+    call.closed = false;
+    setStatus("connecting", "Подключение…");
+    try {
+      const peer = new RTCPeerConnection();
+      call.peer = peer;
+      peer.addEventListener("track", ({ track }) => {
+        ui.audio.srcObject = new MediaStream([track]);
+        ui.audio.play().catch(() => log("Браузер заблокировал автовоспроизведение — нажмите play"));
+      });
+
+      call.mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      call.mic.getAudioTracks().forEach((track) => peer.addTrack(track, call.mic));
+
+      const channel = peer.createDataChannel("oai-events");
+      call.channel = channel;
+      channel.addEventListener("message", onChannelMessage);
+      channel.addEventListener("close", () => {
+        if (call.channel === channel && !call.closed) cleanup("Канал закрыт без session.closed", "error");
+      });
+
+      await peer.setLocalDescription(await peer.createOffer());
+      await waitForIce(peer);
+
+      const result = await api("/api/session", {
+        sdp: peer.localDescription.sdp,
+        instructions: ui.instructions.value,
+      });
+      log(`Сессия создана: ${result.session.id}`);
+      await peer.setRemoteDescription({ type: "answer", sdp: result.transport.sdp });
+    } catch (error) {
+      cleanup(`Ошибка: ${error.message}`, "error");
+    }
+  }
+
+  function stopCall() {
+    if (!call.started || call.channel?.readyState !== "open") return;
+    ui.stop.disabled = true;
+    setStatus("closing", "Завершение…");
+    call.channel.send(JSON.stringify({ type: "session.close" }));
+    call.closeTimer = setTimeout(() => cleanup("Нет session.closed за 15 с, микрофон освобождён", "error"), CLOSE_TIMEOUT_MS);
+  }
+
+  async function sendChat() {
+    const content = ui.chatInput.value.trim();
+    if (!content || ui.send.disabled) return;
+    ui.send.disabled = true;
+    const messages = [...chatHistory, { role: "user", content }];
+    log(`> ${content}`, "l-input");
+    try {
+      const { text } = await api("/api/chat", { messages, instructions: ui.instructions.value });
+      chatHistory.push(messages.at(-1), { role: "assistant", content: text });
+      ui.chatInput.value = "";
+      log(`< ${text}`, "l-output");
+    } catch (error) {
+      log(`Ошибка чата: ${error.message}`, "l-error");
+    } finally {
+      ui.send.disabled = false;
+    }
+  }
+
+  ui.start.addEventListener("click", startCall);
+  ui.stop.addEventListener("click", stopCall);
+  ui.send.addEventListener("click", sendChat);
+  ui.chatInput.addEventListener("keydown", (e) => e.key === "Enter" && sendChat());
+  ui.clear.addEventListener("click", () => ui.log.replaceChildren());
+</script>
+</body>
+</html>
