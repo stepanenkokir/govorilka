@@ -5,6 +5,10 @@
     <string name="conversations_title">Диалоги</string>
     <string name="conversations_empty">Нет диалогов</string>
     <string name="conversations_new">Новый диалог</string>
+    <string name="conversations_delete">Удалить</string>
+    <string name="conversations_delete_title">Удалить диалог?</string>
+    <string name="conversations_delete_text">«%1$s» и его сообщения будут удалены без возможности восстановления.</string>
+    <string name="cancel">Отмена</string>
 
     <string name="settings_title">Настройки</string>
     <string name="settings_server_url">Адрес сервера</string>
@@ -12,7 +16,6 @@
     <string name="settings_app_secret">Секрет</string>
     <string name="settings_instructions">Промпт</string>
 
-    <string name="chat_default_title">Новый диалог</string>
     <string name="chat_input_placeholder">Сообщение</string>
     <string name="chat_mic">Микрофон</string>
 </resources>

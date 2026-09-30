@@ -31,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.govorilka.R
+import com.govorilka.domain.NEW_CONVERSATION_TITLE
 
 private val MicButtonSize = 88.dp
 private const val DISABLED_MIC_ALPHA = 0.55f
@@ -38,10 +39,10 @@ private const val DISABLED_MIC_ALPHA = 0.55f
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
-    viewModel: ChatViewModel = viewModel(),
+    viewModel: ChatViewModel = viewModel(factory = GovorilkaViewModelFactory()),
 ) {
     ChatContent(
-        title = viewModel.title.value ?: stringResource(R.string.chat_default_title),
+        title = viewModel.title.value ?: NEW_CONVERSATION_TITLE,
         draft = viewModel.draft.value,
         inputEnabled = viewModel.inputEnabled.value,
         micEnabled = viewModel.micEnabled.value,
@@ -147,7 +148,7 @@ private fun MicButton(enabled: Boolean, onClick: () -> Unit) {
 private fun ChatPreview() {
     GovorilkaTheme {
         ChatContent(
-            title = stringResource(R.string.chat_default_title),
+            title = NEW_CONVERSATION_TITLE,
             draft = "",
             inputEnabled = false,
             micEnabled = false,

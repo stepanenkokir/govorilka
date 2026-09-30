@@ -4,14 +4,25 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.govorilka.domain.ConversationStore
+import kotlinx.coroutines.launch
 
-class ChatViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
+class ChatViewModel(savedStateHandle: SavedStateHandle, store: ConversationStore) : ViewModel() {
     private val conversationId: String = checkNotNull(savedStateHandle[Routes.CONVERSATION_ID])
 
-    val title: State<String?> = mutableStateOf(null)
+    private val _title = mutableStateOf<String?>(null)
+
+    val title: State<String?> = _title
     val draft: State<String> = mutableStateOf("")
     val inputEnabled: State<Boolean> = mutableStateOf(false)
     val micEnabled: State<Boolean> = mutableStateOf(false)
+
+    init {
+        viewModelScope.launch {
+            store.observe(conversationId).collect { _title.value = it?.title }
+        }
+    }
 
     fun onDraftChange(value: String) = Unit
 
