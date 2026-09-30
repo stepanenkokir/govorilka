@@ -14,7 +14,12 @@ object GovorilkaViewModelFactory : ViewModelProvider.Factory {
         val viewModel = when (modelClass) {
             ConversationsViewModel::class -> ConversationsViewModel(container.conversationStore)
             SettingsViewModel::class -> SettingsViewModel(container.settingsStore)
-            ChatViewModel::class -> ChatViewModel(extras.createSavedStateHandle(), container.conversationStore)
+            ChatViewModel::class -> ChatViewModel(
+                extras.createSavedStateHandle(),
+                container.conversationStore,
+                container.settingsStore,
+                container.voiceCall,
+            )
             else -> error("Unknown ViewModel: $modelClass")
         }
         @Suppress("UNCHECKED_CAST")

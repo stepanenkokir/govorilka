@@ -10,6 +10,9 @@ import com.govorilka.data.remote.OkHttpGovorilkaApi
 import com.govorilka.domain.ConversationStore
 import com.govorilka.domain.GovorilkaApi
 import com.govorilka.domain.SettingsStore
+import com.govorilka.domain.VoiceCall
+import com.govorilka.voice.WebRtcVoiceCall
+import com.govorilka.voice.createPeerConnectionFactory
 
 class AppContainer(context: Context) {
     private val database = Room.databaseBuilder<GovorilkaDatabase>(context, "govorilka.db")
@@ -19,4 +22,5 @@ class AppContainer(context: Context) {
     val conversationStore: ConversationStore = RoomConversationStore(database.conversationDao())
     val settingsStore: SettingsStore = DataStoreSettingsStore(context)
     val govorilkaApi: GovorilkaApi = OkHttpGovorilkaApi()
+    val voiceCall: VoiceCall = WebRtcVoiceCall(context, createPeerConnectionFactory(context), govorilkaApi)
 }

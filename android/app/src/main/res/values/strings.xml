@@ -18,4 +18,12 @@
 
     <string name="chat_input_placeholder">Сообщение</string>
     <string name="chat_mic">Микрофон</string>
+    <string name="chat_end_call">Завершить звонок</string>
+    <string name="chat_call_connecting">Подключение…</string>
+    <string name="chat_call_listening">Слушаю</string>
+    <string name="chat_call_closing">Завершение…</string>
+    <string name="chat_call_missing_settings">Укажите адрес сервера и секрет в настройках</string>
+    <string name="chat_call_mic_denied">Нужен доступ к микрофону</string>
+    <string name="chat_mute">Без звука</string>
+    <string name="chat_speaker">Динамик</string>
 </resources>
