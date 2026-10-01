@@ -6,7 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.govorilka.domain.ApiResult
 import com.govorilka.domain.ConversationStore
+import com.govorilka.domain.GovorilkaApi
 import com.govorilka.domain.Message
 import com.govorilka.domain.MessageRole
 import com.govorilka.domain.MessageSource
@@ -15,11 +17,15 @@ import com.govorilka.domain.TranscriptAssembler
 import com.govorilka.domain.Utterance
 import com.govorilka.domain.VoiceCall
 import com.govorilka.domain.VoiceEvent
+import com.govorilka.domain.chatHistory
 import com.govorilka.domain.conversationTitle
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+private const val SAVE_FAILURE = "Не удалось сохранить сообщение"
 
 sealed interface CallPhase {
     data object Idle : CallPhase
@@ -40,11 +46,18 @@ sealed interface CallPhase {
 val CallPhase.isActive: Boolean
     get() = this == CallPhase.Connecting || this == CallPhase.Listening
 
+sealed interface SendError {
+    data object MissingSettings : SendError
+
+    data class Failed(val message: String) : SendError
+}
+
 class ChatViewModel(
     savedStateHandle: SavedStateHandle,
     private val store: ConversationStore,
     private val settingsStore: SettingsStore,
     private val voiceCall: VoiceCall,
+    private val api: GovorilkaApi,
     private val writeScope: CoroutineScope,
 ) : ViewModel() {
     private val conversationId: String = checkNotNull(savedStateHandle[Routes.CONVERSATION_ID])
@@ -65,9 +78,15 @@ class ChatViewModel(
     private var awaitingCall = false
     private var ownsCall = false
 
+    private val _draft = mutableStateOf("")
+    private val _sending = mutableStateOf(false)
+    private val _sendError = mutableStateOf<SendError?>(null)
+
     val title: State<String?> = _title
-    val draft: State<String> = mutableStateOf("")
-    val inputEnabled: State<Boolean> = mutableStateOf(false)
+    val draft: State<String> = _draft
+    val sending: State<Boolean> = _sending
+    val sendError: State<SendError?> = _sendError
+    val canSend: State<Boolean> = derivedStateOf { !_sending.value && _draft.value.isNotBlank() }
     val micEnabled: State<Boolean> = derivedStateOf { _phase.value != CallPhase.Closing }
     val phase: State<CallPhase> = _phase
     val muted: State<Boolean> = _muted
@@ -92,9 +111,62 @@ class ChatViewModel(
         }
     }
 
-    fun onDraftChange(value: String) = Unit
+    fun onDraftChange(value: String) {
+        if (_sending.value) return
+        _draft.value = value
+        _sendError.value = null
+    }
 
-    fun onSend() = Unit
+    fun onSend() {
+        if (!canSend.value) return
+        val prompt = _draft.value.trim()
+        _sending.value = true
+        _sendError.value = null
+        viewModelScope.launch {
+            try {
+                _sendError.value = send(prompt)
+                if (_sendError.value == null) _draft.value = ""
+            } finally {
+                _sending.value = false
+            }
+        }
+    }
+
+    /** Returns null once the question and the reply are both stored. */
+    private suspend fun send(prompt: String): SendError? {
+        val settings = settingsStore.settings.first()
+        if (settings.serverBaseUrl.isBlank() || settings.appSecret.isBlank()) return SendError.MissingSettings
+        val history = chatHistory(_saved.value, prompt)
+        val reply = when (val result = api.sendChat(settings.serverBaseUrl, settings.appSecret, history, settings.instructions)) {
+            is ApiResult.Failure -> return SendError.Failed(result.message)
+            is ApiResult.Success -> result.value
+        }
+        val askedAt = System.currentTimeMillis()
+        val messages = listOf(
+            textMessage(MessageRole.User, prompt, askedAt),
+            textMessage(MessageRole.Assistant, reply, askedAt + 1),
+        )
+        return try {
+            store.appendMessages(messages, conversationTitle(prompt))
+            null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            SendError.Failed(SAVE_FAILURE)
+        }
+    }
+
+    private fun textMessage(role: MessageRole, text: String, createdAt: Long) = Message(
+        id = UUID.randomUUID().toString(),
+        conversationId = conversationId,
+        role = role,
+        text = text,
+        source = MessageSource.Text,
+        startMs = null,
+        endMs = null,
+        liveSessionId = null,
+        createdAt = createdAt,
+    )
 
     fun onMicClick() {
         when {

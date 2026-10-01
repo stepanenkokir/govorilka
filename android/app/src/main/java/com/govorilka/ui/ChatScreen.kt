@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -31,10 +32,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -77,7 +81,9 @@ fun ChatScreen(
         title = viewModel.title.value ?: NEW_CONVERSATION_TITLE,
         feed = viewModel.feed.value,
         draft = viewModel.draft.value,
-        inputEnabled = viewModel.inputEnabled.value,
+        sending = viewModel.sending.value,
+        canSend = viewModel.canSend.value,
+        sendError = viewModel.sendError.value,
         micEnabled = viewModel.micEnabled.value,
         phase = phase,
         muted = viewModel.muted.value,
@@ -100,7 +106,9 @@ private fun ChatContent(
     title: String,
     feed: List<FeedItem>,
     draft: String,
-    inputEnabled: Boolean,
+    sending: Boolean,
+    canSend: Boolean,
+    sendError: SendError?,
     micEnabled: Boolean,
     phase: CallPhase,
     muted: Boolean,
@@ -117,7 +125,9 @@ private fun ChatContent(
         bottomBar = {
             ChatBottomBar(
                 draft = draft,
-                inputEnabled = inputEnabled,
+                sending = sending,
+                canSend = canSend,
+                sendError = sendError,
                 micEnabled = micEnabled,
                 phase = phase,
                 muted = muted,
@@ -137,7 +147,9 @@ private fun ChatContent(
 @Composable
 private fun ChatBottomBar(
     draft: String,
-    inputEnabled: Boolean,
+    sending: Boolean,
+    canSend: Boolean,
+    sendError: SendError?,
     micEnabled: Boolean,
     phase: CallPhase,
     muted: Boolean,
@@ -184,8 +196,15 @@ private fun ChatBottomBar(
                     value = draft,
                     onValueChange = onDraftChange,
                     modifier = Modifier.weight(1f),
-                    enabled = inputEnabled,
+                    readOnly = sending,
                     placeholder = { Text(stringResource(R.string.chat_input_placeholder)) },
+                    trailingIcon = { SendButton(sending = sending, enabled = canSend, onClick = onSend) },
+                    supportingText = if (sendError != null) {
+                        { Text(sendErrorText(sendError)) }
+                    } else {
+                        null
+                    },
+                    isError = sendError != null,
                     shape = RoundedCornerShape(24.dp),
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -195,6 +214,35 @@ private fun ChatBottomBar(
             }
         }
     }
+}
+
+@Composable
+private fun SendButton(sending: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    AnimatedContent(targetState = sending, label = "sendButton") { isSending ->
+        if (isSending) {
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.5.dp,
+                    color = MicAmber,
+                )
+            }
+        } else {
+            IconButton(onClick = onClick, enabled = enabled) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = stringResource(R.string.chat_send),
+                    tint = if (enabled) MicAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun sendErrorText(error: SendError): String = when (error) {
+    SendError.MissingSettings -> stringResource(R.string.chat_call_missing_settings)
+    is SendError.Failed -> error.message
 }
 
 @Composable
@@ -302,7 +350,9 @@ private fun ChatPreview() {
                 FeedItem("2", MessageRole.Assistant, "Привет! Всё хорошо, чем помочь?"),
             ),
             draft = "",
-            inputEnabled = false,
+            sending = false,
+            canSend = false,
+            sendError = null,
             micEnabled = true,
             phase = CallPhase.Listening,
             muted = false,

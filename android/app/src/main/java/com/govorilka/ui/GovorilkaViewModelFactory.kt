@@ -19,6 +19,7 @@ object GovorilkaViewModelFactory : ViewModelProvider.Factory {
                 container.conversationStore,
                 container.settingsStore,
                 container.voiceCall,
+                container.govorilkaApi,
                 container.writeScope,
             )
             else -> error("Unknown ViewModel: $modelClass")

@@ -47,6 +47,14 @@ interface ConversationDao {
         if (insertMessage(message) == NOT_INSERTED) return
         touch(message.conversationId, message.createdAt, newTitle, placeholder)
     }
+
+    @Transaction
+    suspend fun appendMessages(messages: List<MessageEntity>, newTitle: String?, placeholder: String) {
+        for (message in messages) {
+            if (insertMessage(message) == NOT_INSERTED) continue
+            touch(message.conversationId, message.createdAt, newTitle, placeholder)
+        }
+    }
 }
 
 @Database(entities = [ConversationEntity::class, MessageEntity::class], version = 1, exportSchema = false)

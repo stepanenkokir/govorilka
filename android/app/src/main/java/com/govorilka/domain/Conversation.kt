@@ -45,4 +45,7 @@ interface ConversationStore {
 
     /** Ignores a repeated id. [titleIfStillNew] replaces the title only while it is [NEW_CONVERSATION_TITLE]. */
     suspend fun appendMessage(message: Message, titleIfStillNew: String?)
+
+    /** Stores all of [messages] or none of them; otherwise behaves like [appendMessage]. */
+    suspend fun appendMessages(messages: List<Message>, titleIfStillNew: String?)
 }

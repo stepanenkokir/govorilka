@@ -29,4 +29,7 @@ class RoomConversationStore(private val dao: ConversationDao) : ConversationStor
 
     override suspend fun appendMessage(message: Message, titleIfStillNew: String?) =
         dao.appendMessage(message.toEntity(), titleIfStillNew, NEW_CONVERSATION_TITLE)
+
+    override suspend fun appendMessages(messages: List<Message>, titleIfStillNew: String?) =
+        dao.appendMessages(messages.map { it.toEntity() }, titleIfStillNew, NEW_CONVERSATION_TITLE)
 }

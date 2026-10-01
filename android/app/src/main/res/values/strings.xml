@@ -17,6 +17,7 @@
     <string name="settings_instructions">Промпт</string>
 
     <string name="chat_input_placeholder">Сообщение</string>
+    <string name="chat_send">Отправить</string>
     <string name="chat_mic">Микрофон</string>
     <string name="chat_end_call">Завершить звонок</string>
     <string name="chat_call_connecting">Подключение…</string>
