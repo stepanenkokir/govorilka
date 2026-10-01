@@ -5,6 +5,7 @@ import {
   APP_SECRET,
   BODY_LIMIT,
   CHAT_TIMEOUT_MS,
+  DEFAULT_VOICE,
   LIVE_MODEL,
   LIVE_SESSIONS_URL,
   MAX_CHAT_MESSAGES,
@@ -13,10 +14,14 @@ import {
   RESPONSES_MODEL,
   RESPONSES_URL,
   SESSION_TIMEOUT_MS,
+  VOICES,
+  WEB_SEARCH_TOOLS,
   resolveInstructions,
 } from "./config.mjs";
 
-const INDEX_PATH = fileURLToPath(new URL("./public/index.html", import.meta.url));
+const INDEX_PATH = fileURLToPath(
+  new URL("./public/index.html", import.meta.url),
+);
 const ROLES = new Set(["user", "assistant"]);
 
 class HttpError extends Error {
@@ -29,19 +34,25 @@ class HttpError extends Error {
 const badRequest = (message) => new HttpError(400, message);
 const upstreamFailed = () => new HttpError(502, "OpenAI request failed");
 
-const isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-const isNonEmptyString = (value) => typeof value === "string" && value.trim() !== "";
+const isObject = (value) =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+const isNonEmptyString = (value) =>
+  typeof value === "string" && value.trim() !== "";
 
 const digest = (value) => createHash("sha256").update(value).digest();
 const SECRET_DIGEST = digest(APP_SECRET);
 
 function requireSecret(req, _res, next) {
   const [scheme, token] = (req.get("authorization") ?? "").split(" ");
-  const valid = scheme === "Bearer" && token && timingSafeEqual(digest(token), SECRET_DIGEST);
+  const valid =
+    scheme === "Bearer" &&
+    token &&
+    timingSafeEqual(digest(token), SECRET_DIGEST);
   next(valid ? undefined : new HttpError(401, "Unauthorized"));
 }
 
-const asyncRoute = (handler) => (req, res, next) => handler(req, res).catch(next);
+const asyncRoute = (handler) => (req, res, next) =>
+  handler(req, res).catch(next);
 
 async function postOpenAI(route, url, body, timeoutMs) {
   let response;
@@ -69,10 +80,31 @@ async function postOpenAI(route, url, body, timeoutMs) {
   });
 }
 
+function readVoice(value) {
+  if (value === undefined || value === null || value === "") return DEFAULT_VOICE;
+  if (!VOICES.includes(value)) {
+    throw badRequest(`voice must be one of: ${VOICES.join(", ")}`);
+  }
+  return value;
+}
+
+function readWebSearch(value) {
+  if (value === undefined || value === null) return false;
+  if (typeof value !== "boolean") throw badRequest("webSearch must be a boolean");
+  return value;
+}
+
+const searchTools = (webSearch) => (webSearch ? WEB_SEARCH_TOOLS : {});
+
 function readSessionBody(body) {
   if (!isObject(body)) throw badRequest("Body must be a JSON object");
   if (!isNonEmptyString(body.sdp)) throw badRequest("sdp is required");
-  return { sdp: body.sdp, instructions: resolveInstructions(body.instructions) };
+  return {
+    sdp: body.sdp,
+    instructions: resolveInstructions(body.instructions),
+    voice: readVoice(body.voice),
+    webSearch: readWebSearch(body.webSearch),
+  };
 }
 
 function readChatBody(body) {
@@ -84,18 +116,27 @@ function readChatBody(body) {
   const valid = messages.every(
     (m) => isObject(m) && ROLES.has(m.role) && typeof m.content === "string",
   );
-  if (!valid) throw badRequest("Each message needs role user|assistant and string content");
-  if (messages.at(-1).role !== "user") throw badRequest("Last message must be from user");
+  if (!valid)
+    throw badRequest(
+      "Each message needs role user|assistant and string content",
+    );
+  if (messages.at(-1).role !== "user")
+    throw badRequest("Last message must be from user");
   return {
     messages: messages.map(({ role, content }) => ({ role, content })),
     instructions: resolveInstructions(body.instructions),
+    webSearch: readWebSearch(body.webSearch),
   };
 }
 
 function toSessionResponse(result) {
   const id = result?.session?.id;
   const transport = result?.transport;
-  if (typeof id !== "string" || transport?.type !== "webrtc" || typeof transport.sdp !== "string") {
+  if (
+    typeof id !== "string" ||
+    transport?.type !== "webrtc" ||
+    typeof transport.sdp !== "string"
+  ) {
     console.error("/api/session: unexpected OpenAI response shape");
     throw upstreamFailed();
   }
@@ -105,7 +146,9 @@ function toSessionResponse(result) {
 function extractOutputText(result) {
   const text = (Array.isArray(result?.output) ? result.output : [])
     .flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
-    .filter((part) => part?.type === "output_text" && typeof part.text === "string")
+    .filter(
+      (part) => part?.type === "output_text" && typeof part.text === "string",
+    )
     .map((part) => part.text)
     .join("");
   if (!text) {
@@ -125,7 +168,7 @@ app.use("/api", requireSecret, express.json({ limit: BODY_LIMIT }));
 app.post(
   "/api/session",
   asyncRoute(async (req, res) => {
-    const { sdp, instructions } = readSessionBody(req.body);
+    const { sdp, instructions, voice, webSearch } = readSessionBody(req.body);
     const result = await postOpenAI(
       "/api/session",
       LIVE_SESSIONS_URL,
@@ -133,9 +176,14 @@ app.post(
         session: {
           model: LIVE_MODEL,
           instructions,
+          audio: { output: { voice } },
           delegation: {
             type: "responses",
-            responses: { model: RESPONSES_MODEL, instructions },
+            responses: {
+              model: RESPONSES_MODEL,
+              instructions,
+              ...searchTools(webSearch),
+            },
           },
         },
         transport: { type: "webrtc", sdp },
@@ -149,11 +197,16 @@ app.post(
 app.post(
   "/api/chat",
   asyncRoute(async (req, res) => {
-    const { messages, instructions } = readChatBody(req.body);
+    const { messages, instructions, webSearch } = readChatBody(req.body);
     const result = await postOpenAI(
       "/api/chat",
       RESPONSES_URL,
-      { model: RESPONSES_MODEL, instructions, input: messages },
+      {
+        model: RESPONSES_MODEL,
+        instructions,
+        input: messages,
+        ...searchTools(webSearch),
+      },
       CHAT_TIMEOUT_MS,
     );
     res.json({ text: extractOutputText(result) });
@@ -173,6 +226,8 @@ app.use((error, _req, res, _next) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Govorilka server: http://localhost:${PORT} (LAN: 0.0.0.0:${PORT})`);
+app.listen(PORT, "127.0.0.1", () => {
+  console.log(
+    `Govorilka server: http://localhost:${PORT} (LAN: 127.0.0.1:${PORT})`,
+  );
 });

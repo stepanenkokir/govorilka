@@ -5,6 +5,13 @@ export const DEFAULT_INSTRUCTIONS =
   "Ты голосовой ассистент. Говори по-русски, кратко и естественно. " +
   "На сложные вопросы опирайся на ответ бэкенда и пересказывай его простым языком.";
 
+export const VOICES = ["gleam", "meridian", "delta", "cinder"];
+export const DEFAULT_VOICE = "gleam";
+export const WEB_SEARCH_TOOLS = {
+  tools: [{ type: "web_search" }],
+  tool_choice: "auto",
+};
+
 export const LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 export const RESPONSES_URL = "https://api.openai.com/v1/responses";
 

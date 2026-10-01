@@ -49,7 +49,7 @@
     }
     label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
     label + label { margin-top: 12px; }
-    input, textarea {
+    input, textarea, select {
       font: inherit;
       color: var(--text);
       background: var(--bg);
@@ -58,7 +58,9 @@
       padding: 10px 12px;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
-    input:focus, textarea:focus {
+    .toggle { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 14px; cursor: pointer; }
+    .toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--amber); cursor: pointer; }
+    input:focus, textarea:focus, select:focus {
       outline: none;
       border-color: var(--amber);
       box-shadow: 0 0 0 3px rgb(232 163 61 / 0.25);
@@ -120,6 +122,18 @@
     <label>Промпт (пусто — сервер подставит свой по умолчанию)
       <textarea id="instructions" placeholder="instructions"></textarea>
     </label>
+    <label>Голос (меняется только при новом звонке)
+      <select id="voice">
+        <option value="gleam">Gleam — женский</option>
+        <option value="meridian">Meridian — мужской</option>
+        <option value="delta">Delta — женский</option>
+        <option value="cinder">Cinder — мужской</option>
+      </select>
+    </label>
+    <label class="toggle">
+      <input id="web-search" type="checkbox">
+      <span>Веб-поиск</span>
+    </label>
   </section>
 
   <section class="card">
@@ -160,7 +174,8 @@
 
   const $ = (id) => document.getElementById(id);
   const ui = {
-    secret: $("secret"), instructions: $("instructions"), start: $("start"), stop: $("stop"),
+    secret: $("secret"), instructions: $("instructions"), voice: $("voice"), webSearch: $("web-search"),
+    start: $("start"), stop: $("stop"),
     status: $("status"), statusText: $("status-text"), audio: $("audio"),
     chatInput: $("chat-input"), send: $("send"), log: $("log"), clear: $("clear"),
   };
@@ -280,6 +295,8 @@
       const result = await api("/api/session", {
         sdp: peer.localDescription.sdp,
         instructions: ui.instructions.value,
+        voice: ui.voice.value,
+        webSearch: ui.webSearch.checked,
       });
       log(`Сессия создана: ${result.session.id}`);
       await peer.setRemoteDescription({ type: "answer", sdp: result.transport.sdp });
@@ -303,7 +320,11 @@
     const messages = [...chatHistory, { role: "user", content }];
     log(`> ${content}`, "l-input");
     try {
-      const { text } = await api("/api/chat", { messages, instructions: ui.instructions.value });
+      const { text } = await api("/api/chat", {
+        messages,
+        instructions: ui.instructions.value,
+        webSearch: ui.webSearch.checked,
+      });
       chatHistory.push(messages.at(-1), { role: "assistant", content: text });
       ui.chatInput.value = "";
       log(`< ${text}`, "l-output");
