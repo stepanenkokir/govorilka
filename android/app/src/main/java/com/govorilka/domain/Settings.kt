@@ -6,10 +6,25 @@ const val DEFAULT_INSTRUCTIONS =
     "Ты голосовой ассистент. Говори по-русски, кратко и естественно. " +
         "На сложные вопросы опирайся на ответ бэкенда и пересказывай его простым языком."
 
+enum class Voice(val wireName: String) {
+    Gleam("gleam"),
+    Meridian("meridian"),
+    Delta("delta"),
+    Cinder("cinder");
+
+    companion object {
+        val DEFAULT = Gleam
+
+        fun fromWireName(value: String?): Voice = entries.firstOrNull { it.wireName == value } ?: DEFAULT
+    }
+}
+
 data class Settings(
     val serverBaseUrl: String,
     val appSecret: String,
     val instructions: String,
+    val voice: Voice,
+    val webSearch: Boolean,
 )
 
 interface SettingsStore {
@@ -20,4 +35,8 @@ interface SettingsStore {
     suspend fun setAppSecret(value: String)
 
     suspend fun setInstructions(value: String)
+
+    suspend fun setVoice(value: Voice)
+
+    suspend fun setWebSearch(value: Boolean)
 }

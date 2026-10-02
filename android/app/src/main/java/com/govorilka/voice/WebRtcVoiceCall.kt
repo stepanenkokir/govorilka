@@ -8,6 +8,7 @@ import android.os.Build
 import com.govorilka.domain.ApiResult
 import com.govorilka.domain.GovorilkaApi
 import com.govorilka.domain.ParsedLiveEvent
+import com.govorilka.domain.Voice
 import com.govorilka.domain.VoiceCall
 import com.govorilka.domain.VoiceEvent
 import com.govorilka.domain.parseLiveEvent
@@ -51,6 +52,14 @@ private const val CLOSE_TIMEOUT_MS = 15_000L
 private const val SESSION_CLOSE = """{"type":"session.close"}"""
 private const val STREAM_ID = "govorilka"
 
+private data class CallRequest(
+    val baseUrl: String,
+    val appSecret: String,
+    val instructions: String,
+    val voice: Voice,
+    val webSearch: Boolean,
+)
+
 private const val CONNECTION_FAILED = "Не удалось установить голосовое соединение"
 private const val CONNECTION_LOST = "Голосовое соединение прервалось"
 private const val CLOSE_TIMEOUT = "Сервер не подтвердил завершение, микрофон освобождён"
@@ -91,13 +100,14 @@ class WebRtcVoiceCall(
 
     override val events: Flow<VoiceEvent> = _events.asSharedFlow()
 
-    override fun start(baseUrl: String, appSecret: String, instructions: String) {
+    override fun start(baseUrl: String, appSecret: String, instructions: String, voice: Voice, webSearch: Boolean) {
+        val request = CallRequest(baseUrl, appSecret, instructions, voice, webSearch)
         scope.launch {
             hangUp?.complete(Unit)
             callJob?.join()
             val signal = CompletableDeferred<Unit>()
             hangUp = signal
-            callJob = scope.launch { runCall(baseUrl, appSecret, instructions, signal) }
+            callJob = scope.launch { runCall(request, signal) }
         }
     }
 
@@ -113,12 +123,7 @@ class WebRtcVoiceCall(
         scope.launch { hangUp?.complete(Unit) }
     }
 
-    private suspend fun runCall(
-        baseUrl: String,
-        appSecret: String,
-        instructions: String,
-        hangUp: CompletableDeferred<Unit>,
-    ) {
+    private suspend fun runCall(request: CallRequest, hangUp: CompletableDeferred<Unit>) {
         _events.emit(VoiceEvent.Connecting)
         val inbox = Channel<String>(Channel.UNLIMITED)
         val iceGathered = CompletableDeferred<Unit>()
@@ -135,7 +140,7 @@ class WebRtcVoiceCall(
                 ?: throw CallFailure(CONNECTION_FAILED)
             events.registerObserver(ChannelObserver(events, inbox))
             channel = events
-            val negotiated = hangUp.raceWith { negotiate(peer, iceGathered, baseUrl, appSecret, instructions) }
+            val negotiated = hangUp.raceWith { negotiate(peer, iceGathered, request) }
             if (negotiated == null) VoiceEvent.Closed else listen(inbox, events, hangUp)
         } catch (failure: CallFailure) {
             VoiceEvent.Failed(failure.message)
@@ -160,15 +165,14 @@ class WebRtcVoiceCall(
     private suspend fun negotiate(
         peer: PeerConnection,
         iceGathered: CompletableDeferred<Unit>,
-        baseUrl: String,
-        appSecret: String,
-        instructions: String,
+        request: CallRequest,
     ) {
         val offer = peer.awaitOffer()
         awaitSet { peer.setLocalDescription(it, offer) }
         withTimeoutOrNull(ICE_TIMEOUT_MS) { iceGathered.await() }
         val sdp = peer.localDescription?.description ?: throw CallFailure(CONNECTION_FAILED)
-        when (val result = api.createSession(baseUrl, appSecret, sdp, instructions)) {
+        val result = with(request) { api.createSession(baseUrl, appSecret, sdp, instructions, voice, webSearch) }
+        when (result) {
             is ApiResult.Failure -> throw CallFailure(result.message)
             is ApiResult.Success -> {
                 val answer = SessionDescription(SessionDescription.Type.ANSWER, result.value.sdp)

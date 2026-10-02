@@ -15,9 +15,16 @@
     <string name="settings_server_url_hint">Без слэша в конце</string>
     <string name="settings_app_secret">Секрет</string>
     <string name="settings_instructions">Промпт</string>
+    <string name="settings_voice">Голос</string>
+    <string name="settings_voice_hint">Меняется со следующего звонка</string>
+    <string name="settings_voice_gleam">Gleam — женский</string>
+    <string name="settings_voice_meridian">Meridian — мужской</string>
+    <string name="settings_voice_delta">Delta — женский</string>
+    <string name="settings_voice_cinder">Cinder — мужской</string>
+    <string name="settings_web_search">Веб-поиск</string>
+    <string name="settings_web_search_hint">Ассистент сможет искать свежую информацию в интернете</string>
+    <string name="settings_version">Версия %1$s</string>
 
-    <string name="chat_input_placeholder">Сообщение</string>
-    <string name="chat_send">Отправить</string>
     <string name="chat_mic">Микрофон</string>
     <string name="chat_end_call">Завершить звонок</string>
     <string name="chat_call_connecting">Подключение…</string>

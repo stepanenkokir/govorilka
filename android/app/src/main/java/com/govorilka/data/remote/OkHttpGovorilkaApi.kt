@@ -4,6 +4,7 @@ import com.govorilka.domain.ApiResult
 import com.govorilka.domain.ChatLine
 import com.govorilka.domain.GovorilkaApi
 import com.govorilka.domain.LiveSession
+import com.govorilka.domain.Voice
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -27,16 +28,25 @@ class OkHttpGovorilkaApi : GovorilkaApi {
         appSecret: String,
         sdp: String,
         instructions: String,
-    ): ApiResult<LiveSession> =
-        execute(baseUrl, SESSION_PATH, appSecret, sessionBody(sdp, instructions), SESSION_TIMEOUT_SECONDS, ::parseSession)
+        voice: Voice,
+        webSearch: Boolean,
+    ): ApiResult<LiveSession> = execute(
+        baseUrl,
+        SESSION_PATH,
+        appSecret,
+        sessionBody(sdp, instructions, voice, webSearch),
+        SESSION_TIMEOUT_SECONDS,
+        ::parseSession,
+    )
 
     override suspend fun sendChat(
         baseUrl: String,
         appSecret: String,
         messages: List<ChatLine>,
         instructions: String,
+        webSearch: Boolean,
     ): ApiResult<String> =
-        execute(baseUrl, CHAT_PATH, appSecret, chatBody(messages, instructions), CHAT_TIMEOUT_SECONDS, ::parseChat)
+        execute(baseUrl, CHAT_PATH, appSecret, chatBody(messages, instructions, webSearch), CHAT_TIMEOUT_SECONDS, ::parseChat)
 
     private suspend fun <T> execute(
         baseUrl: String,

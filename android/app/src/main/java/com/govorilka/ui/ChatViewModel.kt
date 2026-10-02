@@ -137,7 +137,8 @@ class ChatViewModel(
         val settings = settingsStore.settings.first()
         if (settings.serverBaseUrl.isBlank() || settings.appSecret.isBlank()) return SendError.MissingSettings
         val history = chatHistory(_saved.value, prompt)
-        val reply = when (val result = api.sendChat(settings.serverBaseUrl, settings.appSecret, history, settings.instructions)) {
+        val result = with(settings) { api.sendChat(serverBaseUrl, appSecret, history, instructions, webSearch) }
+        val reply = when (result) {
             is ApiResult.Failure -> return SendError.Failed(result.message)
             is ApiResult.Success -> result.value
         }
@@ -213,7 +214,7 @@ class ChatViewModel(
                 return@launch
             }
             awaitingCall = true
-            voiceCall.start(settings.serverBaseUrl, settings.appSecret, settings.instructions)
+            with(settings) { voiceCall.start(serverBaseUrl, appSecret, instructions, voice, webSearch) }
         }
     }
 

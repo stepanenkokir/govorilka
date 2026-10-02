@@ -4,8 +4,10 @@ import com.govorilka.domain.ApiResult
 import com.govorilka.domain.ChatLine
 import com.govorilka.domain.LiveSession
 import com.govorilka.domain.MessageRole
+import com.govorilka.domain.Voice
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -20,24 +22,51 @@ class ApiCodecTest {
 
     private fun JsonObject.string(key: String): String = getValue(key).jsonPrimitive.content
 
+    private fun session(sdp: String = "v=0", instructions: String = "", voice: Voice = Voice.DEFAULT, webSearch: Boolean = false) =
+        parseJson(sessionBody(sdp, instructions, voice, webSearch))
+
+    private fun chat(messages: List<ChatLine>, instructions: String = "", webSearch: Boolean = false) =
+        parseJson(chatBody(messages, instructions, webSearch))
+
     @Test
     fun sessionBodyCarriesSdpAndInstructions() {
-        val body = parseJson(sessionBody("v=0", "  Говори кратко  "))
+        val body = session(instructions = "  Говори кратко  ")
         assertEquals("v=0", body.string("sdp"))
         assertEquals("  Говори кратко  ", body.string("instructions"))
     }
 
     @Test
+    fun sessionBodyCarriesVoiceAndWebSearch() {
+        val body = session(voice = Voice.Cinder, webSearch = true)
+        assertEquals("cinder", body.string("voice"))
+        assertEquals(true, body.getValue("webSearch").jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun chatBodyCarriesWebSearch() {
+        val messages = listOf(ChatLine(MessageRole.User, "Привет"))
+        assertEquals(false, chat(messages).getValue("webSearch").jsonPrimitive.boolean)
+        assertEquals(true, chat(messages, webSearch = true).getValue("webSearch").jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun unknownVoiceFallsBackToDefault() {
+        assertEquals(Voice.Gleam, Voice.fromWireName("marin"))
+        assertEquals(Voice.Gleam, Voice.fromWireName(null))
+        assertEquals(Voice.Delta, Voice.fromWireName("delta"))
+    }
+
+    @Test
     fun blankInstructionsAreOmitted() {
-        assertFalse("instructions" in parseJson(sessionBody("v=0", "")))
-        assertFalse("instructions" in parseJson(sessionBody("v=0", " \n ")))
-        assertFalse("instructions" in parseJson(chatBody(listOf(ChatLine(MessageRole.User, "Привет")), " ")))
+        assertFalse("instructions" in session())
+        assertFalse("instructions" in session(instructions = " \n "))
+        assertFalse("instructions" in chat(listOf(ChatLine(MessageRole.User, "Привет")), " "))
     }
 
     @Test
     fun sdpWithQuotesRoundTrips() {
         val sdp = "a=\"quoted\"\r\nb=\\x"
-        assertEquals(sdp, parseJson(sessionBody(sdp, "")).string("sdp"))
+        assertEquals(sdp, session(sdp = sdp).string("sdp"))
     }
 
     @Test
@@ -46,7 +75,7 @@ class ApiCodecTest {
             ChatLine(MessageRole.User, "Привет,   как  дела? "),
             ChatLine(MessageRole.Assistant, "Отлично"),
         )
-        val encoded = parseJson(chatBody(messages, "Промпт")).getValue("messages").jsonArray.map { it.jsonObject }
+        val encoded = chat(messages, "Промпт").getValue("messages").jsonArray.map { it.jsonObject }
         assertEquals(listOf("user", "assistant"), encoded.map { it.string("role") })
         assertEquals("Привет,   как  дела? ", encoded[0].string("content"))
     }

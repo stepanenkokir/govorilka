@@ -4,6 +4,7 @@ import com.govorilka.domain.ApiResult
 import com.govorilka.domain.ChatLine
 import com.govorilka.domain.LiveSession
 import com.govorilka.domain.MessageRole
+import com.govorilka.domain.Voice
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
@@ -33,10 +34,19 @@ private val json = Json {
 }
 
 @Serializable
-private data class SessionRequest(val sdp: String, val instructions: String?)
+private data class SessionRequest(
+    val sdp: String,
+    val instructions: String?,
+    val voice: String,
+    val webSearch: Boolean,
+)
 
 @Serializable
-private data class ChatRequest(val messages: List<ChatMessageDto>, val instructions: String?)
+private data class ChatRequest(
+    val messages: List<ChatMessageDto>,
+    val instructions: String?,
+    val webSearch: Boolean,
+)
 
 @Serializable
 private data class ChatMessageDto(val role: String, val content: String)
@@ -67,14 +77,15 @@ internal fun buildRequest(url: HttpUrl, appSecret: String, body: String): Reques
         .post(body.toRequestBody(JSON_MEDIA_TYPE))
         .build()
 
-internal fun sessionBody(sdp: String, instructions: String): String =
-    json.encodeToString(SessionRequest(sdp, instructions.orNullIfBlank()))
+internal fun sessionBody(sdp: String, instructions: String, voice: Voice, webSearch: Boolean): String =
+    json.encodeToString(SessionRequest(sdp, instructions.orNullIfBlank(), voice.wireName, webSearch))
 
-internal fun chatBody(messages: List<ChatLine>, instructions: String): String =
+internal fun chatBody(messages: List<ChatLine>, instructions: String, webSearch: Boolean): String =
     json.encodeToString(
         ChatRequest(
             messages = messages.map { ChatMessageDto(it.role.wireName(), it.content) },
             instructions = instructions.orNullIfBlank(),
+            webSearch = webSearch,
         ),
     )
 

@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -23,25 +22,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,7 +48,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,7 +55,7 @@ import com.govorilka.R
 import com.govorilka.domain.MessageRole
 import com.govorilka.domain.NEW_CONVERSATION_TITLE
 
-private val MicButtonSize = 88.dp
+private val MicButtonHeight = 88.dp
 private const val DISABLED_MIC_ALPHA = 0.55f
 private const val LISTENING_PULSE_SCALE = 1.06f
 
@@ -80,16 +72,10 @@ fun ChatScreen(
     ChatContent(
         title = viewModel.title.value ?: NEW_CONVERSATION_TITLE,
         feed = viewModel.feed.value,
-        draft = viewModel.draft.value,
-        sending = viewModel.sending.value,
-        canSend = viewModel.canSend.value,
-        sendError = viewModel.sendError.value,
         micEnabled = viewModel.micEnabled.value,
         phase = phase,
         muted = viewModel.muted.value,
         speakerOn = viewModel.speakerOn.value,
-        onDraftChange = viewModel::onDraftChange,
-        onSend = viewModel::onSend,
         onMicClick = {
             val granted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
@@ -105,16 +91,10 @@ fun ChatScreen(
 private fun ChatContent(
     title: String,
     feed: List<FeedItem>,
-    draft: String,
-    sending: Boolean,
-    canSend: Boolean,
-    sendError: SendError?,
     micEnabled: Boolean,
     phase: CallPhase,
     muted: Boolean,
     speakerOn: Boolean,
-    onDraftChange: (String) -> Unit,
-    onSend: () -> Unit,
     onMicClick: () -> Unit,
     onMuteToggle: () -> Unit,
     onSpeakerToggle: () -> Unit,
@@ -124,16 +104,10 @@ private fun ChatContent(
         topBar = { BackTopAppBar(title = title, onBack = onBack) },
         bottomBar = {
             ChatBottomBar(
-                draft = draft,
-                sending = sending,
-                canSend = canSend,
-                sendError = sendError,
                 micEnabled = micEnabled,
                 phase = phase,
                 muted = muted,
                 speakerOn = speakerOn,
-                onDraftChange = onDraftChange,
-                onSend = onSend,
                 onMicClick = onMicClick,
                 onMuteToggle = onMuteToggle,
                 onSpeakerToggle = onSpeakerToggle,
@@ -146,16 +120,10 @@ private fun ChatContent(
 
 @Composable
 private fun ChatBottomBar(
-    draft: String,
-    sending: Boolean,
-    canSend: Boolean,
-    sendError: SendError?,
     micEnabled: Boolean,
     phase: CallPhase,
     muted: Boolean,
     speakerOn: Boolean,
-    onDraftChange: (String) -> Unit,
-    onSend: () -> Unit,
     onMicClick: () -> Unit,
     onMuteToggle: () -> Unit,
     onSpeakerToggle: () -> Unit,
@@ -165,7 +133,6 @@ private fun ChatBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .imePadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -188,61 +155,9 @@ private fun ChatBottomBar(
                     )
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = onDraftChange,
-                    modifier = Modifier.weight(1f),
-                    readOnly = sending,
-                    placeholder = { Text(stringResource(R.string.chat_input_placeholder)) },
-                    trailingIcon = { SendButton(sending = sending, enabled = canSend, onClick = onSend) },
-                    supportingText = if (sendError != null) {
-                        { Text(sendErrorText(sendError)) }
-                    } else {
-                        null
-                    },
-                    isError = sendError != null,
-                    shape = RoundedCornerShape(24.dp),
-                    maxLines = 4,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { onSend() }),
-                )
-                MicButton(enabled = micEnabled, phase = phase, onClick = onMicClick)
-            }
+            MicButton(enabled = micEnabled, phase = phase, onClick = onMicClick)
         }
     }
-}
-
-@Composable
-private fun SendButton(sending: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    AnimatedContent(targetState = sending, label = "sendButton") { isSending ->
-        if (isSending) {
-            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.5.dp,
-                    color = MicAmber,
-                )
-            }
-        } else {
-            IconButton(onClick = onClick, enabled = enabled) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = stringResource(R.string.chat_send),
-                    tint = if (enabled) MicAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun sendErrorText(error: SendError): String = when (error) {
-    SendError.MissingSettings -> stringResource(R.string.chat_call_missing_settings)
-    is SendError.Failed -> error.message
 }
 
 @Composable
@@ -304,18 +219,22 @@ private fun MicButton(enabled: Boolean, phase: CallPhase, onClick: () -> Unit) {
         label = "micContainer",
     )
     val content = if (active) MaterialTheme.colorScheme.onError else OnMicAmber
+    val iconModifier = Modifier
+        .size(36.dp)
+        .graphicsLayer {
+            val scale = pulse?.value ?: 1f
+            scaleX = scale
+            scaleY = scale
+        }
+    val shape = RoundedCornerShape(MicButtonHeight / 2)
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .size(MicButtonSize)
-            .graphicsLayer {
-                val scale = pulse?.value ?: 1f
-                scaleX = scale
-                scaleY = scale
-            }
-            .shadow(elevation = if (enabled) 8.dp else 2.dp, shape = CircleShape),
-        shape = CircleShape,
+            .fillMaxWidth()
+            .height(MicButtonHeight)
+            .shadow(elevation = if (enabled) 8.dp else 2.dp, shape = shape),
+        shape = shape,
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = container,
             contentColor = content,
@@ -327,13 +246,13 @@ private fun MicButton(enabled: Boolean, phase: CallPhase, onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = stringResource(R.string.chat_end_call),
-                modifier = Modifier.size(36.dp),
+                modifier = iconModifier,
             )
         } else {
             Icon(
                 painter = painterResource(R.drawable.ic_mic),
                 contentDescription = stringResource(R.string.chat_mic),
-                modifier = Modifier.size(36.dp),
+                modifier = iconModifier,
             )
         }
     }
@@ -349,16 +268,10 @@ private fun ChatPreview() {
                 FeedItem("1", MessageRole.User, "Привет! Как дела?"),
                 FeedItem("2", MessageRole.Assistant, "Привет! Всё хорошо, чем помочь?"),
             ),
-            draft = "",
-            sending = false,
-            canSend = false,
-            sendError = null,
             micEnabled = true,
             phase = CallPhase.Listening,
             muted = false,
             speakerOn = true,
-            onDraftChange = {},
-            onSend = {},
             onMicClick = {},
             onMuteToggle = {},
             onSpeakerToggle = {},

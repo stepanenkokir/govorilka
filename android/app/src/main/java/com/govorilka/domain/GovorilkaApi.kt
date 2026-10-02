@@ -23,6 +23,8 @@ interface GovorilkaApi {
         appSecret: String,
         sdp: String,
         instructions: String,
+        voice: Voice,
+        webSearch: Boolean,
     ): ApiResult<LiveSession>
 
     suspend fun sendChat(
@@ -30,5 +32,6 @@ interface GovorilkaApi {
         appSecret: String,
         messages: List<ChatLine>,
         instructions: String,
+        webSearch: Boolean,
     ): ApiResult<String>
 }

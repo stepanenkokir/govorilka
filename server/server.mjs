@@ -15,8 +15,11 @@ import {
   RESPONSES_URL,
   SESSION_TIMEOUT_MS,
   VOICES,
+  LIVE_WEB_SEARCH_NOTE,
+  TOOL_WEB_SEARCH_NOTE,
   WEB_SEARCH_TOOLS,
   resolveInstructions,
+  withCapability,
 } from "./config.mjs";
 
 const INDEX_PATH = fileURLToPath(
@@ -175,13 +178,13 @@ app.post(
       {
         session: {
           model: LIVE_MODEL,
-          instructions,
+          instructions: withCapability(instructions, webSearch, LIVE_WEB_SEARCH_NOTE),
           audio: { output: { voice } },
           delegation: {
             type: "responses",
             responses: {
               model: RESPONSES_MODEL,
-              instructions,
+              instructions: withCapability(instructions, webSearch, TOOL_WEB_SEARCH_NOTE),
               ...searchTools(webSearch),
             },
           },
@@ -203,7 +206,7 @@ app.post(
       RESPONSES_URL,
       {
         model: RESPONSES_MODEL,
-        instructions,
+        instructions: withCapability(instructions, webSearch, TOOL_WEB_SEARCH_NOTE),
         input: messages,
         ...searchTools(webSearch),
       },

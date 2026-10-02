@@ -18,7 +18,7 @@ sealed interface VoiceEvent {
 interface VoiceCall {
     val events: Flow<VoiceEvent>
 
-    fun start(baseUrl: String, appSecret: String, instructions: String)
+    fun start(baseUrl: String, appSecret: String, instructions: String, voice: Voice, webSearch: Boolean)
 
     fun setMuted(muted: Boolean)
 
